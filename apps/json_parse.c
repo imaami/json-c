@@ -31,7 +31,7 @@ static const char *fname = NULL;
 #define json_tokener_get_parse_end(tok) ((tok)->char_offset)
 #endif
 
-static void usage(const char *argv0, int exitval, const char *errmsg);
+static int usage(const char *argv0, int exitval, const char *errmsg);
 static void showmem(void);
 static int parseit(int fd, int (*callback)(struct json_object *));
 static int showobj(struct json_object *new_obj);
@@ -82,7 +82,7 @@ static int parseit(int fd, int (*callback)(struct json_object *))
 			int parse_end = json_tokener_get_parse_end(tok);
 			if (obj == NULL && jerr != json_tokener_continue)
 			{
-				char *aterr = (start_pos + parse_end < sizeof(buf)) ?
+				char *aterr = (start_pos + parse_end < (int)sizeof(buf)) ?
 					&buf[start_pos + parse_end] : "";
 				fflush(stdout);
 				int fail_offset = total_read - ret + start_pos + parse_end;
@@ -138,7 +138,7 @@ static int showobj(struct json_object *new_obj)
 	return 0;
 }
 
-static void usage(const char *argv0, int exitval, const char *errmsg)
+static int usage(const char *argv0, int exitval, const char *errmsg)
 {
 	FILE *fp = stdout;
 	if (exitval != 0)
@@ -153,12 +153,11 @@ static void usage(const char *argv0, int exitval, const char *errmsg)
 
 	fprintf(fp, "\nWARNING WARNING WARNING\n");
 	fprintf(fp, "This is a prototype, it may change or be removed at any time!\n");
-	exit(exitval);
+	return exitval;
 }
 
 int main(int argc, char **argv)
 {
-	json_object *new_obj;
 	int opt;
 
 	while ((opt = getopt(argc, argv, "fhns")) != -1)
@@ -168,21 +167,23 @@ int main(int argc, char **argv)
 		case 'f': formatted_output = 1; break;
 		case 'n': show_output = 0; break;
 		case 's': strict_mode = 1; break;
-		case 'h': usage(argv[0], 0, NULL);
-		default: /* '?' */ usage(argv[0], EXIT_FAILURE, "Unknown arguments");
+		case 'h': return usage(argv[0], 0, NULL);
+		default: /* '?' */ return usage(argv[0], EXIT_FAILURE, "Unknown arguments");
 		}
 	}
 	if (optind >= argc)
 	{
-		usage(argv[0], EXIT_FAILURE, "Expected argument after options");
+		return usage(argv[0], EXIT_FAILURE, "Expected argument after options");
 	}
 	fname = argv[optind];
 
 	int fd = open(argv[optind], O_RDONLY, 0);
+	if (fd < 0)
+		return EXIT_FAILURE;
 	showmem();
 	if (parseit(fd, showobj) != 0)
 		exit(EXIT_FAILURE);
 	showmem();
 
-	exit(EXIT_SUCCESS);
+	return EXIT_SUCCESS;
 }
